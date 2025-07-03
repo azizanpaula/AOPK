@@ -34,6 +34,9 @@ jobs:
             fs.writeFileSync('./index.html', content);
           "
 
+      - name: Verify File Content 🧐
+        run: cat ./index.html
+
       - name: Deploy 🚀
         uses: peaceiris/actions-gh-pages@v3
         with:
