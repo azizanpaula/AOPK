@@ -15,18 +15,27 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
       - name: Replace Firebase Config 🤫
         run: |
-          sed -i 's|__API_KEY__|${{ secrets.API_KEY }}|g' index.html
-          sed -i 's|__AUTH_DOMAIN__|${{ secrets.AUTH_DOMAIN }}|g' index.html
-          sed -i 's|__PROJECT_ID__|${{ secrets.PROJECT_ID }}|g' index.html
-          sed -i 's|__STORAGE_BUCKET__|${{ secrets.STORAGE_BUCKET }}|g' index.html
-          sed -i 's|__MESSAGING_SENDER_ID__|${{ secrets.MESSAGING_SENDER_ID }}|g' index.html
-          sed -i 's|__APP_ID__|${{ secrets.APP_ID }}|g' index.html
+          node -e "
+            const fs = require('fs');
+            let content = fs.readFileSync('./index.html', 'utf8');
+            content = content.replace(/__API_KEY__/g, '${{ secrets.API_KEY }}');
+            content = content.replace(/__AUTH_DOMAIN__/g, '${{ secrets.AUTH_DOMAIN }}');
+            content = content.replace(/__PROJECT_ID__/g, '${{ secrets.PROJECT_ID }}');
+            content = content.replace(/__STORAGE_BUCKET__/g, '${{ secrets.STORAGE_BUCKET }}');
+            content = content.replace(/__MESSAGING_SENDER_ID__/g, '${{ secrets.MESSAGING_SENDER_ID }}');
+            content = content.replace(/__APP_ID__/g, '${{ secrets.APP_ID }}');
+            fs.writeFileSync('./index.html', content);
+          "
 
       - name: Deploy 🚀
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
-
