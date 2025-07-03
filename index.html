@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Alur Kerja AOPK Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f3f4f6; --text-color: #1f2937; --card-bg: #ffffff;
+            --muted-text: #6b7280; --border-color: #e5e7eb; --input-bg: #f9fafb;
+            --unconfirmed-bg: #fefce8; /* yellow-50 */
+        }
+        html.dark {
+            --bg-color: #111827; --text-color: #f9fafb; --card-bg: #1f2937;
+            --muted-text: #9ca3af; --border-color: #374151; --input-bg: #374151;
+            --unconfirmed-bg: #422006; /* a dark yellow */
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); }
+        .task-card { transition: all 0.3s ease; border-left-width: 5px; background-color: var(--card-bg); }
+        .unconfirmed-task { background-color: var(--unconfirmed-bg); border-left-color: #f59e0b; }
+        #app-loading, #login-view, #app-view { display: none; }
+        @keyframes pulse-red-border { 0%, 100% { border-left-color: #ef4444; } 50% { border-left-color: #fca5a5; } }
+        .deadline-passed { animation: pulse-red-border 2s infinite; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Loading Indicator -->
+    <div id="app-loading" class="flex justify-center items-center h-screen">
+        <div class="text-center">
+            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="mt-2 text-lg">Memuat Aplikasi...</p>
+        </div>
+    </div>
+
+    <!-- Login View -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div class="max-w-md w-full bg-[var(--card-bg)] p-8 rounded-xl shadow-lg space-y-6">
+            <div>
+                <h2 class="text-center text-3xl font-bold text-blue-600 dark:text-blue-400">Login AOPK Online</h2>
+                <p class="mt-2 text-center text-sm text-[var(--muted-text)]">Gunakan email dan password untuk masuk.</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <input type="email" id="login-email" placeholder="Email" required class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-3" />
+                <input type="password" id="login-password" placeholder="Password" required class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-3" />
+                <select id="login-role" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-3">
+                    <option value="aopk">Saya adalah AOPK</option>
+                    <option value="ao_kredit">Saya adalah AO Kredit</option>
+                </select>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Login atau Daftar</button>
+            </form>
+            <p id="login-error" class="text-red-500 text-sm text-center"></p>
+        </div>
+    </div>
+
+    <!-- Main App View -->
+    <div id="app-view" class="container mx-auto p-4 md:p-6">
+        <header class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Dasbor Kerja AOPK</h1>
+                <p class="text-md text-[var(--muted-text)] mt-1">Anda login sebagai: <span id="user-role" class="font-semibold"></span></p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="theme-switcher" class="p-2 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <svg id="theme-icon-light" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <svg id="theme-icon-dark" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </div>
+                <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg text-sm">Logout</button>
+            </div>
+        </header>
+
+        <!-- Form (Visible to all) -->
+        <div id="task-form-container" class="bg-[var(--card-bg)] p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4 border-b border-[var(--border-color)] pb-2">Tambah Tugas Baru</h2>
+            <form id="task-form" class="space-y-4">
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="task-source" class="block text-sm font-medium mb-1">Pemberi Tugas</label>
+                        <select id="task-source" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" required>
+                            <option>AO Kredit</option><option>Kantor Pusat</option><option>Debitur</option><option>Pimpinan</option><option>Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="job-type" class="block text-sm font-medium mb-1">Jenis Pekerjaan</label>
+                        <select id="job-type" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" required>
+                            <option value="Akad Kredit">Akad Kredit</option><option value="Penilaian Agunan">Penilaian Agunan</option><option value="Pengajuan Klaim">Pengajuan Klaim</option><option value="Laporan Asuransi">Laporan Asuransi</option><option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div id="conditional-input-container">
+                        <div id="debitur-input-wrapper" style="display:none;"><label for="debitur-name" class="block text-sm font-medium mb-1">Nama Debitur</label><input type="text" id="debitur-name" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" placeholder="Input nama debitur"></div>
+                        <div id="other-input-wrapper" style="display:none;"><label for="other-job-detail" class="block text-sm font-medium mb-1">Detail Pekerjaan</label><input type="text" id="other-job-detail" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" placeholder="Input detail pekerjaan"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="task-priority" class="block text-sm font-medium mb-1">Prioritas</label>
+                        <select id="task-priority" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5">
+                            <option value="Normal">Normal</option><option value="Rendah">Rendah</option><option value="Mendesak">Mendesak</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="task-date" class="block text-sm font-medium mb-1">Deadline</label>
+                        <div class="flex space-x-2"><input type="date" id="task-date" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" required><input type="time" id="task-time" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" required></div>
+                    </div>
+                </div>
+                <div>
+                    <label for="task-notes" class="block text-sm font-medium mb-1">Catatan</label>
+                    <textarea id="task-notes" rows="2" class="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5" placeholder="Tambahkan catatan jika perlu..."></textarea>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg">Ajukan Tugas</button>
+            </form>
+        </div>
+
+        <!-- AOPK Features -->
+        <div id="aopk-features" class="aopk-only">
+            <div class="bg-[var(--card-bg)] p-4 rounded-xl shadow-lg mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <input type="search" id="search-input" placeholder="Cari pekerjaan..." class="md:col-span-1 w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5">
+                    <div class="md:col-span-2 flex flex-wrap gap-2 justify-end">
+                        <select id="filter-priority" class="bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg p-2.5 text-sm"><option value="">Semua Prioritas</option><option value="Mendesak">Mendesak</option><option value="Normal">Normal</option><option value="Rendah">Rendah</option></select>
+                        <button id="export-csv" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-3 rounded-lg">Ekspor CSV</button>
+                        <button id="toggle-archive" class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium py-2 px-3 rounded-lg">Lihat Arsip</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4">Ikhtisar Produktivitas</h2>
+                <div id="overview-container" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- Task Columns -->
+        <div id="task-columns" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div><h2 class="text-2xl font-bold mb-4">Antrian</h2><div id="pending-tasks" class="space-y-4 min-h-[200px] bg-gray-200/20 dark:bg-gray-800/20 p-4 rounded-lg"></div></div>
+            <div><h2 class="text-2xl font-bold mb-4">Sedang Dikerjakan</h2><div id="inprogress-tasks" class="space-y-4 min-h-[200px] bg-yellow-100/20 dark:bg-yellow-900/10 p-4 rounded-lg"></div></div>
+            <div class="aopk-only"><h2 class="text-2xl font-bold mb-4">Selesai</h2><div id="completed-tasks" class="space-y-4 min-h-[200px] bg-green-100/20 dark:bg-green-900/10 p-4 rounded-lg"></div></div>
+            <div id="archived-column" class="aopk-only" style="display:none;"><h2 class="text-2xl font-bold mb-4">Arsip</h2><div id="archived-tasks" class="space-y-4 min-h-[200px] bg-gray-500/10 p-4 rounded-lg"></div></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            doc, 
+            updateDoc, 
+            deleteDoc,
+            serverTimestamp,
+            query,
+            orderBy
+        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // --- Konfigurasi Firebase ---
+        // GANTI DENGAN KONFIGURASI FIREBASE ANDA SENDIRI
+        const firebaseConfig = {
+            apiKey: "%%AIzaSyACVlOU3EGtEnwoFooDVcL26thv9of1RbY%%",
+            authDomain: "%%aopkonline.firebaseapp.com%%",
+            projectId: "%%aopkonline%%",
+            storageBucket: "%%aopkonline.firebasestorage.app%%",
+            messagingSenderId: "%%849679364022%%",
+            appId: "%%1:849679364022:web:61fa7371e3d5d930421b17%%"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global state
+        let currentUser = null;
+        let currentUserRole = null;
+        let tasksUnsubscribe = null;
+
+        // DOM Elements
+        const appLoading = document.getElementById('app-loading');
+        const loginView = document.getElementById('login-view');
+        const appView = document.getElementById('app-view');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const logoutButton = document.getElementById('logout-button');
+        const userRoleSpan = document.getElementById('user-role');
+        
+        const taskForm = document.getElementById('task-form');
+        const pendingTasksContainer = document.getElementById('pending-tasks');
+        const inprogressTasksContainer = document.getElementById('inprogress-tasks');
+        const completedTasksContainer = document.getElementById('completed-tasks');
+        const archivedTasksContainer = document.getElementById('archived-tasks');
+        
+        const jobTypeSelect = document.getElementById('job-type');
+        const conditionalInputContainer = document.getElementById('conditional-input-container');
+        const debiturInputWrapper = document.getElementById('debitur-input-wrapper');
+        const otherInputWrapper = document.getElementById('other-input-wrapper');
+
+
+        // --- AUTHENTICATION LOGIC ---
+        onAuthStateChanged(auth, user => {
+            appLoading.style.display = 'none';
+            if (user) {
+                currentUser = user;
+                // For this demo, role is stored in localStorage. In a real app, use Firestore/Custom Claims.
+                currentUserRole = localStorage.getItem('userRole');
+                if (!currentUserRole) {
+                    // If no role, force logout
+                    signOut(auth);
+                    return;
+                }
+                showAppView();
+                listenToTasks();
+            } else {
+                currentUser = null;
+                currentUserRole = null;
+                showLoginView();
+                if (tasksUnsubscribe) tasksUnsubscribe();
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const role = document.getElementById('login-role').value;
+            loginError.textContent = '';
+
+            try {
+                // Try to sign in
+                await signInWithEmailAndPassword(auth, email, password);
+                localStorage.setItem('userRole', role);
+            } catch (error) {
+                if (error.code === 'auth/user-not-found') {
+                    // If user not found, create a new account
+                    try {
+                        await createUserWithEmailAndPassword(auth, email, password);
+                        localStorage.setItem('userRole', role);
+                    } catch (createError) {
+                        loginError.textContent = `Error pendaftaran: ${createError.message}`;
+                    }
+                } else {
+                    loginError.textContent = `Error login: ${error.message}`;
+                }
+            }
+        });
+
+        logoutButton.addEventListener('click', () => {
+            localStorage.removeItem('userRole');
+            signOut(auth);
+        });
+
+        // --- VIEW MANAGEMENT ---
+        function showLoginView() {
+            loginView.style.display = 'flex';
+            appView.style.display = 'none';
+        }
+
+        function showAppView() {
+            loginView.style.display = 'none';
+            appView.style.display = 'block';
+            userRoleSpan.textContent = currentUserRole === 'aopk' ? 'AOPK' : 'AO Kredit';
+            adjustUIForRole();
+        }
+        
+        function adjustUIForRole() {
+            const aopkOnlyElements = document.querySelectorAll('.aopk-only');
+            if (currentUserRole === 'aopk') {
+                aopkOnlyElements.forEach(el => el.style.display = 'block');
+                document.getElementById('task-columns').classList.remove('lg:grid-cols-2');
+                document.getElementById('task-columns').classList.add('lg:grid-cols-3');
+            } else { // ao_kredit
+                aopkOnlyElements.forEach(el => el.style.display = 'none');
+                document.getElementById('task-columns').classList.remove('lg:grid-cols-3');
+                document.getElementById('task-columns').classList.add('lg:grid-cols-2');
+            }
+        }
+
+        // --- FIRESTORE & TASK LOGIC ---
+        function listenToTasks() {
+            const tasksRef = collection(db, "tasks");
+            const q = query(tasksRef, orderBy("deadline", "asc"));
+
+            tasksUnsubscribe = onSnapshot(q, (snapshot) => {
+                const tasks = [];
+                snapshot.forEach(doc => {
+                    tasks.push({ id: doc.id, ...doc.data() });
+                });
+                renderTasks(tasks);
+            });
+        }
+        
+        taskForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const source = document.getElementById('task-source').value;
+            const jobType = document.getElementById('job-type').value;
+            const priority = document.getElementById('task-priority').value;
+            const notes = document.getElementById('task-notes').value;
+            const date = document.getElementById('task-date').value;
+            const time = document.getElementById('task-time').value;
+            let jobDetail = '';
+            
+            if (debiturInputWrapper.style.display === 'block') {
+                jobDetail = document.getElementById('debitur-name').value.trim();
+            } else if (otherInputWrapper.style.display === 'block') {
+                jobDetail = document.getElementById('other-job-detail').value.trim();
+            }
+
+            if (!source || !jobType || !date || !time) {
+                alert('Kolom wajib harus diisi.');
+                return;
+            }
+
+            const newTask = {
+                source,
+                jobType,
+                jobDetail,
+                priority,
+                notes,
+                deadline: `${date}T${time}`,
+                status: 'unconfirmed',
+                createdBy: currentUser.uid,
+                timeCreated: serverTimestamp(),
+                timeReceived: null,
+                confirmedBy: null
+            };
+
+            try {
+                await addDoc(collection(db, "tasks"), newTask);
+                taskForm.reset();
+                handleJobTypeChange();
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("Gagal menambahkan tugas. Lihat konsol untuk detail.");
+            }
+        });
+
+        function renderTasks(tasks) {
+            pendingTasksContainer.innerHTML = '';
+            inprogressTasksContainer.innerHTML = '';
+            completedTasksContainer.innerHTML = '';
+            archivedTasksContainer.innerHTML = '';
+            
+            // Separate unconfirmed tasks
+            const unconfirmedTasks = tasks.filter(t => t.status === 'unconfirmed');
+            
+            // Add a visual separator for AOPK
+            if (currentUserRole === 'aopk' && unconfirmedTasks.length > 0) {
+                 pendingTasksContainer.innerHTML += `<div class="text-center text-sm font-semibold text-yellow-700 dark:text-yellow-400 my-2 p-2 bg-yellow-100 dark:bg-yellow-900/50 rounded-md">Menunggu Konfirmasi Berkas</div>`;
+            }
+
+            tasks.forEach(task => {
+                const taskCard = createTaskCard(task);
+                switch(task.status) {
+                    case 'unconfirmed': 
+                        // AO Kredit sees it as pending, AOPK sees it as unconfirmed
+                        pendingTasksContainer.appendChild(taskCard);
+                        break;
+                    case 'pending': pendingTasksContainer.appendChild(taskCard); break;
+                    case 'in-progress': inprogressTasksContainer.appendChild(taskCard); break;
+                    case 'completed': completedTasksContainer.appendChild(taskCard); break;
+                    case 'archived': archivedTasksContainer.appendChild(taskCard); break;
+                }
+            });
+        }
+
+        function createTaskCard(task) {
+            const card = document.createElement('div');
+            card.className = 'task-card p-4 rounded-lg shadow-md flex flex-col space-y-3';
+            card.setAttribute('data-id', task.id);
+            
+            const isAOPK = currentUserRole === 'aopk';
+            const deadline = new Date(task.deadline);
+            const now = new Date();
+            const timeLeft = deadline - now;
+
+            // Border color by priority
+            const priorityColors = { 'Mendesak': 'border-red-500', 'Normal': 'border-yellow-500', 'Rendah': 'border-blue-500' };
+            let borderColor = priorityColors[task.priority] || 'border-gray-400';
+            
+            if (timeLeft < 0 && task.status !== 'completed' && task.status !== 'archived') {
+                card.classList.add('deadline-passed');
+            }
+            if (task.status === 'completed' || task.status === 'archived') {
+                borderColor = 'border-gray-400';
+            }
+            if (task.status === 'unconfirmed') {
+                card.classList.add('unconfirmed-task');
+            }
+            card.classList.add(borderColor);
+
+            const formattedDeadline = deadline.toLocaleString('id-ID', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+            const formattedReceivedTime = task.timeReceived ? new Date(task.timeReceived.toDate()).toLocaleString('id-ID', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'Belum Diterima';
+
+            let cardContent = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold text-md">${task.jobType}</h3>
+                        <p class="text-sm text-[var(--muted-text)]">${task.jobDetail || `Dari: ${task.source}`}</p>
+                    </div>
+                    <span class="text-xs font-semibold px-2 py-1 rounded-full ${priorityColors[task.priority]?.replace('border', 'bg')?.replace('-500', '-100')} ${priorityColors[task.priority]?.replace('border', 'text')?.replace('-500', '-800')}">${task.priority}</span>
+                </div>
+                <div class="text-xs text-[var(--muted-text)]">Diterima: ${formattedReceivedTime}</div>
+                <div class="text-xs text-[var(--muted-text)]">Deadline: ${formattedDeadline}</div>
+                ${task.notes ? `<div class="text-sm p-2 bg-gray-100 dark:bg-gray-800 rounded-md"><strong>Catatan:</strong> ${task.notes}</div>` : ''}
+            `;
+
+            // Action Buttons
+            if (isAOPK) {
+                 cardContent += '<div class="flex flex-wrap gap-2 mt-2">';
+                 if (task.status === 'unconfirmed') {
+                    cardContent += `<button onclick="window.confirmTask('${task.id}')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">Konfirmasi Berkas</button>`;
+                 } else if (task.status === 'pending') {
+                    cardContent += `<button onclick="window.updateTaskStatus('${task.id}', 'in-progress')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">Mulai Kerjakan</button>`;
+                 } else if (task.status === 'in-progress') {
+                    cardContent += `<button onclick="window.updateTaskStatus('${task.id}', 'completed')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">Tandai Selesai</button>`;
+                 } else if (task.status === 'completed') {
+                    cardContent += `<button onclick="window.updateTaskStatus('${task.id}', 'archived')" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">Arsipkan</button>`;
+                 } else { // archived
+                    cardContent += `<button onclick="window.updateTaskStatus('${task.id}', 'completed')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg text-sm">Batal Arsip</button>`;
+                 }
+                 cardContent += `<button onclick="window.deleteTask('${task.id}')" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg text-sm">Hapus</button></div>`;
+            }
+           
+            card.innerHTML = cardContent;
+            return card;
+        }
+        
+        // --- Global Window Functions for onclick events ---
+        window.confirmTask = async (taskId) => {
+            const taskRef = doc(db, "tasks", taskId);
+            try {
+                await updateDoc(taskRef, {
+                    status: 'pending',
+                    timeReceived: serverTimestamp(),
+                    confirmedBy: currentUser.uid
+                });
+            } catch (error) {
+                console.error("Error confirming task: ", error);
+            }
+        };
+        
+        window.updateTaskStatus = async (taskId, newStatus) => {
+             const taskRef = doc(db, "tasks", taskId);
+             try {
+                await updateDoc(taskRef, { status: newStatus });
+             } catch (error) {
+                console.error(`Error updating status to ${newStatus}: `, error);
+             }
+        };
+        
+        window.deleteTask = async (taskId) => {
+            if (confirm('Anda yakin ingin menghapus tugas ini secara permanen?')) {
+                const taskRef = doc(db, "tasks", taskId);
+                try {
+                    await deleteDoc(taskRef);
+                } catch (error) {
+                    console.error("Error deleting task: ", error);
+                }
+            }
+        };
+
+        // --- UTILITY & UI HELPER FUNCTIONS ---
+        function handleJobTypeChange() {
+            const selectedType = jobTypeSelect.value;
+            const debiturTypes = ["Akad Kredit", "Penilaian Agunan", "Pengajuan Klaim"];
+            debiturInputWrapper.style.display = 'none';
+            otherInputWrapper.style.display = 'none';
+            document.getElementById('debitur-name').required = false;
+            document.getElementById('other-job-detail').required = false;
+
+            if (debiturTypes.includes(selectedType)) {
+                debiturInputWrapper.style.display = 'block';
+                document.getElementById('debitur-name').required = true;
+            } else if (selectedType === "Lainnya") {
+                otherInputWrapper.style.display = 'block';
+                document.getElementById('other-job-detail').required = true;
+            }
+        }
+        
+        function loadTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (window.matchMedia('(prefers-color-scheme: dark)').matches && !localStorage.getItem('theme'))) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon-light').classList.add('hidden');
+                document.getElementById('theme-icon-dark').classList.remove('hidden');
+            }
+        }
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            appLoading.style.display = 'flex'; // Show loading initially
+            
+            // Event Listeners
+            jobTypeSelect.addEventListener('change', handleJobTypeChange);
+            document.getElementById('theme-switcher').addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                const isDark = document.documentElement.classList.contains('dark');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                loadTheme();
+            });
+            
+            // Initial calls
+            loadTheme();
+            handleJobTypeChange();
+        });
+    </script>
+</body>
+</html>
