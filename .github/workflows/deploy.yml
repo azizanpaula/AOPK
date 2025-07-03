@@ -15,6 +15,15 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
+      - name: Check Secrets Status 🕵️
+        run: |
+          if [ -z "${{ secrets.API_KEY }}" ]; then echo "❌ API_KEY secret is NOT set."; else echo "✅ API_KEY secret is set."; fi
+          if [ -z "${{ secrets.AUTH_DOMAIN }}" ]; then echo "❌ AUTH_DOMAIN secret is NOT set."; else echo "✅ AUTH_DOMAIN secret is set."; fi
+          if [ -z "${{ secrets.PROJECT_ID }}" ]; then echo "❌ PROJECT_ID secret is NOT set."; else echo "✅ PROJECT_ID secret is set."; fi
+          if [ -z "${{ secrets.STORAGE_BUCKET }}" ]; then echo "❌ STORAGE_BUCKET secret is NOT set."; else echo "✅ STORAGE_BUCKET secret is set."; fi
+          if [ -z "${{ secrets.MESSAGING_SENDER_ID }}" ]; then echo "❌ MESSAGING_SENDER_ID secret is NOT set."; else echo "✅ MESSAGING_SENDER_ID secret is set."; fi
+          if [ -z "${{ secrets.APP_ID }}" ]; then echo "❌ APP_ID secret is NOT set."; else echo "✅ APP_ID secret is set."; fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
